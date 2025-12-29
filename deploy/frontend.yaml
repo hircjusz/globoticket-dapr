@@ -5,9 +5,9 @@ metadata:
   name: frontend
   labels:
     app: frontend
-  annotations: 
-    # https://larry.claman.net/post/2021-04-04-aks-dns-naming/
-    service.beta.kubernetes.io/azure-dns-label-name: globoticket
+  # annotations: 
+  #   # https://larry.claman.net/post/2021-04-04-aks-dns-naming/
+  #   service.beta.kubernetes.io/azure-dns-label-name: globoticket
 spec:
   selector:
     app: frontend
@@ -41,7 +41,7 @@ spec:
     spec:
       containers:
       - name: frontend
-        image: markheath/globoticket-dapr-frontend:latest
+        image: dauh/globoticket-dapr-frontend:latest
         ports:
         - containerPort: 80
         imagePullPolicy: Always

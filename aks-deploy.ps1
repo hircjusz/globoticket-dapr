@@ -17,6 +17,8 @@ az group create -n $RESOURCEGROUP -l $LOCATION
 az aks create -g $RESOURCEGROUP -n $AKS_NAME --node-count 1 `
   --enable-addons http_application_routing --generate-ssh-keys
 
+  az aks approuting enable --resource-group $RESOURCEGROUP --name $AKS_NAME
+
 # Get credentials for kubectl to use
 az aks get-credentials -g $RESOURCEGROUP -n $AKS_NAME --overwrite-existing
 
@@ -29,11 +31,9 @@ $STORAGE_ACCOUNT = "globoticketstate"
 
 az storage account create -n $STORAGE_ACCOUNT -g $RESOURCEGROUP -l $LOCATION --sku Standard_LRS
 
-$STORAGE_CONNECTION_STRING = az storage account show-connection-string `
-  -n $STORAGE_ACCOUNT -g $RESOURCEGROUP --query connectionString -o tsv
+$STORAGE_CONNECTION_STRING = az storage account show-connection-string -n $STORAGE_ACCOUNT -g $RESOURCEGROUP --query connectionString -o tsv
 
-$STORAGE_ACCOUNT_KEY = az storage account keys list -g $RESOURCEGROUP `
-  -n $STORAGE_ACCOUNT --query [0].value -o tsv
+$STORAGE_ACCOUNT_KEY = az storage account keys list -g $RESOURCEGROUP -n $STORAGE_ACCOUNT --query [0].value -o tsv
 
 $env:AZURE_STORAGE_CONNECTION_STRING = $STORAGE_CONNECTION_STRING
 
@@ -42,8 +42,7 @@ az storage container create -n "statestore" --public-access off
 ### STEP 3 - set up Azure service bus for pub sub
 $SERVICE_BUS = "globoticketpubsub"
 
-az servicebus namespace create -g $RESOURCEGROUP `
-    -n $SERVICE_BUS -l $LOCATION --sku Standard
+az servicebus namespace create -g $RESOURCEGROUP -n $SERVICE_BUS -l $LOCATION --sku Standard
 
 $SERVICE_BUS_CONNECTION_STRING = az servicebus namespace authorization-rule keys list `
       -g $RESOURCEGROUP --namespace-name $SERVICE_BUS `
@@ -66,24 +65,21 @@ dapr upgrade -k --runtime-version 1.13.0
 ### STEP 5 - get containers pushed to docker
 
 # ensure we've built all our containers
-docker build -f .\frontend\Dockerfile -t markheath/globoticket-dapr-frontend .
-docker build -f .\catalog\Dockerfile -t markheath/globoticket-dapr-catalog .
-docker build -f .\ordering\Dockerfile -t markheath/globoticket-dapr-ordering .
+docker build -f .\frontend\Dockerfile -t dauh/globoticket-dapr-frontend .
+docker build -f .\catalog\Dockerfile -t dauh/globoticket-dapr-catalog .
+docker build -f .\ordering\Dockerfile -t dauh/globoticket-dapr-ordering .
 
 # and push them to Docker hub 
 # (real world would use ACR instead for private hosting and faster download in Azure)
-docker push markheath/globoticket-dapr-frontend
-docker push markheath/globoticket-dapr-catalog
-docker push markheath/globoticket-dapr-ordering
+docker push dauh/globoticket-dapr-frontend
+docker push dauh/globoticket-dapr-catalog
+docker push dauh/globoticket-dapr-ordering
 
 # STEP 6 - put connection strings into Kubernetes secrets
 
-kubectl create secret generic blob-secret `
-  --from-literal=account-key="$STORAGE_ACCOUNT_KEY"
-kubectl create secret generic servicebus-secret `
-  --from-literal=connection-string="$SERVICE_BUS_CONNECTION_STRING"
-kubectl create secret generic eventcatalogdb `
-  --from-literal=eventcatalogdb="Event Catalog Connection String from Kubernetes"
+kubectl create secret generic blob-secret  --from-literal=account-key="$STORAGE_ACCOUNT_KEY"
+kubectl create secret generic servicebus-secret --from-literal=connection-string="$SERVICE_BUS_CONNECTION_STRING"
+kubectl create secret generic eventcatalogdb  --from-literal=eventcatalogdb="Event Catalog Connection String from Kubernetes"
 
 #kubectl get secrets
 #kubectl describe secrets/blob-secret
@@ -141,6 +137,10 @@ kubectl logs $CATALOG_POD_NAME catalog
 kubectl logs $FRONTEND_POD_NAME frontend
 kubectl logs $ORDERING_POD_NAME ordering
 kubectl logs $FRONTEND_POD_NAME daprd # to see the logs from the sidecar
+
+kubectl logs $CATALOG_POD_NAME daprd
+kubectl logs $CATALOG_POD_NAME daprd
+kubectl logs $ORDERING_POD_NAME daprd
 
 # to view the AKS cluster in the Azure portal
 az aks browse -n $AKS_NAME -g $RESOURCEGROUP
